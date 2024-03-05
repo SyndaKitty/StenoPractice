@@ -13,7 +13,11 @@ local time_elapsed = 0.01
 local words_typed = 0
 local mistakes = 0
 local started = false
-local filename = "6-fqm.txt"
+local filename = "5-test"
+local floating_x = 0
+local tps = 60
+local spt = 1 / tps
+local accumulator = 0
 
 local invalid_color = {1, .5, .5, 1}
 local correct_color = {.6, 1, .7, 1}
@@ -31,16 +35,20 @@ function love.load()
     done = false
     started = false
 
-    font = love.graphics.newFont("Hack-Regular.ttf", 32, "normal", 2)
+    font = love.graphics.newFont("Hack-Regular.ttf", 48, "normal", 2)
     font_alt = love.graphics.newFont("Hack-Regular.ttf", 24, "normal", 2)
-    local test_text = love.filesystem.read(filename)
+    local test_text = love.filesystem.read(filename .. ".txt")
     test_words = string_split(test_text)
     shuffle_list(test_words)
     test_words[#test_words+1] = " "
 end
 
 function love.update(dt)
-    if done or not focused or not started then return end
+    if done then
+        floating_x = floating_x + dt
+        return
+    end
+    if not focused or not started then return end
     time_elapsed = time_elapsed + dt
     if time_until_delete > 0 then
         time_until_delete = time_until_delete - dt
@@ -48,17 +56,30 @@ function love.update(dt)
             input_buffer = ""
         end
     end
+
+    accumulator = accumulator + dt
+    while accumulator > spt do
+        floating_x = floating_x * .9
+        accumulator = accumulator - spt
+    end
 end
 
-function love.draw()
-    local wpm = format(words_typed / (time_elapsed / 60))
-    love.graphics.print("WPM: " .. wpm, font_alt, word_spacing, line_spacing)
+function wpm()
+    return format_number(words_typed / (time_elapsed / 60))
+end
 
+function accuracy()
     local accuracy = 0
     if words_typed + mistakes > 0 then
         accuracy = 100 - (mistakes / (words_typed + mistakes)) * 100
     end
-    local accuracy_str = "Accuracy: " .. format(accuracy) .. "%"
+    return format_number(accuracy)
+end
+
+function love.draw()
+    love.graphics.print("WPM: " .. wpm(), font_alt, word_spacing, line_spacing)
+
+    local accuracy_str = "Accuracy: " .. accuracy() .. "%" 
     local acc_x = love.graphics.getWidth() - font_alt:getWidth(accuracy_str) - word_spacing
     love.graphics.print(accuracy_str, font_alt, acc_x)
 
@@ -66,12 +87,12 @@ function love.draw()
 
     local center_x = love.graphics.getWidth() / 2
     local target_length = font:getWidth(target_word)
-    local word_x = center_x - target_length / 2
-    
+    local word_x = center_x - target_length / 2 + floating_x
+
     local center_y = love.graphics.getHeight() / 2
     local target_height = font:getHeight()
     local word_y = center_y - target_height / 2
-    
+
     love.graphics.print({current_color, target_word}, font, word_x, word_y)
 
     -- Draw previous words
@@ -134,11 +155,13 @@ function love.textinput(text)
     started = true
     input_buffer = input_buffer .. text
     if input_buffer == test_words[word_index] then
+        floating_x = floating_x + font:getWidth(test_words[word_index]) + word_spacing
         word_index = word_index + 1
         input_buffer = ""
         words_typed = words_typed + 1
 
-        if word_index == #test_words + 1 then
+        if word_index == #test_words then
+            save_score(filename, wpm(), accuracy())
             done = true
         end
     elseif partial_match(input_buffer, test_words[word_index]) then
@@ -183,6 +206,15 @@ function partial_match(str1, str2)
     return true
 end
 
-function format(num)
+function format_number(num)
     return string.format("%.1f", num)
+end
+
+function save_score(file, wpm, accuracy)
+    local score_filename = file .. "_score.txt"
+    local score_row = os.date("%m-%d_%H-%M-%S ") .. wpm .. " " .. accuracy .. "\n"
+    
+    local f = love.filesystem.newFile(score_filename, "a")
+    f:write(score_row)
+    f:close()
 end
