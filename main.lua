@@ -13,9 +13,10 @@ local time_elapsed = 0.01
 local words_typed = 0
 local mistakes = 0
 local started = false
-local filename = "5-test"
-local floating_x = 0
-local tps = 60
+local filename = "test"
+local sliding_x = 0
+local sliding_x2 = 0
+local tps = 144
 local spt = 1 / tps
 local accumulator = 0
 
@@ -34,6 +35,8 @@ function love.load()
     mistakes = 0
     done = false
     started = false
+    sliding_x = 0
+    sliding_x2 = -2
 
     font = love.graphics.newFont("Hack-Regular.ttf", 48, "normal", 2)
     font_alt = love.graphics.newFont("Hack-Regular.ttf", 24, "normal", 2)
@@ -45,7 +48,11 @@ end
 
 function love.update(dt)
     if done then
-        floating_x = floating_x + dt
+        accumulator = accumulator + dt
+        while accumulator > spt do
+            sliding_x2 = sliding_x2 * 1.08
+            accumulator = accumulator - spt
+        end
         return
     end
     if not focused or not started then return end
@@ -56,10 +63,10 @@ function love.update(dt)
             input_buffer = ""
         end
     end
-
+    
     accumulator = accumulator + dt
     while accumulator > spt do
-        floating_x = floating_x * .9
+        sliding_x = sliding_x * .95
         accumulator = accumulator - spt
     end
 end
@@ -77,17 +84,18 @@ function accuracy()
 end
 
 function love.draw()
+    love.graphics.setColor(1, 1, 1)
     love.graphics.print("WPM: " .. wpm(), font_alt, word_spacing, line_spacing)
 
-    local accuracy_str = "Accuracy: " .. accuracy() .. "%" 
+    local accuracy_str = "Accuracy: " .. accuracy() .. "%"
     local acc_x = love.graphics.getWidth() - font_alt:getWidth(accuracy_str) - word_spacing
     love.graphics.print(accuracy_str, font_alt, acc_x)
 
     target_word = test_words[word_index]
 
-    local center_x = love.graphics.getWidth() / 2
+    local center_x = love.graphics.getWidth() / 2 - 60
     local target_length = font:getWidth(target_word)
-    local word_x = center_x - target_length / 2 + floating_x
+    local word_x = center_x + sliding_x + sliding_x2
 
     local center_y = love.graphics.getHeight() / 2
     local target_height = font:getHeight()
@@ -133,7 +141,6 @@ function love.draw()
 end
 
 function love.keypressed(key)
-    -- print("k'" .. key .. "'")
     if key == "lshift" then
         lshift_count = lshift_count + 1
         if lshift_count == 3 then
@@ -150,12 +157,11 @@ function love.keypressed(key)
 end
 
 function love.textinput(text)
-    -- print("'" .. text .. "'")
-    if text == " " then return end
+    if done or text == " " then return end
     started = true
     input_buffer = input_buffer .. text
     if input_buffer == test_words[word_index] then
-        floating_x = floating_x + font:getWidth(test_words[word_index]) + word_spacing
+        sliding_x = sliding_x + font:getWidth(test_words[word_index]) + word_spacing
         word_index = word_index + 1
         input_buffer = ""
         words_typed = words_typed + 1
@@ -173,10 +179,6 @@ function love.textinput(text)
         mistakes = mistakes + 1
     end
 end
-
- function love.textedited(text, start, length)
-     -- print("'" .. text .. "', " .. start .. ", " .. length)
- end
 
 function love.focus(f)
     focused = f
@@ -212,7 +214,7 @@ end
 
 function save_score(file, wpm, accuracy)
     local score_filename = file .. "_score.txt"
-    local score_row = os.date("%m-%d_%H-%M-%S ") .. wpm .. " " .. accuracy .. "\n"
+    local score_row = os.date("%m/%d %H:%M:%S ") .. wpm .. " " .. accuracy .. "\n"
     
     local f = love.filesystem.newFile(score_filename, "a")
     f:write(score_row)
