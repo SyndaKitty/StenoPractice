@@ -14,7 +14,6 @@ local practice = {
     words_typed = 0,
     mistakes = 0,
     started = false,
-    filename = "test",
     left_shift = 0,
     right_shift = 0,
     tps = 144,
@@ -24,11 +23,13 @@ local practice = {
     correct_color = {.6, 1, .7, 1},
     next_color = { .5, .5, .5, 1},
     current_color = {.9, .9, .9, 1},
-    done_color = { .5, .5, .5, 1}
+    done_color = { .5, .5, .5, 1},
+    args = {}
 }
 
 
-function practice:load()
+function practice:load(args)
+    args = args or self.args
     self.word_index = 1
     self.time_until_delete = -1
     self.time_elapsed = .01
@@ -39,8 +40,11 @@ function practice:load()
     self.started = false
     self.left_shift = 0
     self.right_shift = -2
+    self.filepath = args[1]
+    self.exercise_name = args[2]
+    self.args = args
 
-    local test_text = love.filesystem.read(self.filename .. ".txt")
+    local test_text = love.filesystem.read(self.filepath)
     self.test_words = self:string_split(test_text)
     self:shuffle_list(self.test_words)
     self.test_words[#self.test_words+1] = " "
@@ -144,8 +148,8 @@ function practice:keypressed(key)
     if key == "lshift" then
         self.lshift_count = self.lshift_count + 1
         if self.lshift_count == 3 then
-            love.load()
             self.lshift_count = 0
+            self:load()
         end
     else
         self.started = true
@@ -167,7 +171,7 @@ function practice:textinput(text)
         self.words_typed = self.words_typed + 1
 
         if self.word_index == #self.test_words then
-            self:save_score(self.filename, self:wpm(), self:accuracy())
+            self:save_score(self.exercise_name, self:wpm(), self:accuracy())
             self.done = true
         end
     elseif self:partial_match(self.input_buffer, self.test_words[self.word_index]) then
@@ -212,10 +216,9 @@ function practice:format_number(num)
     return string.format("%.1f", num)
 end
 
-function practice:save_score(file, wpm, accuracy)
-    local score_filename = file .. "_score.txt"
+function practice:save_score(exercise_name, wpm, accuracy)
+    local score_filename = exercise_name .. "_score.txt"
     local score_row = os.date("%m/%d %H:%M:%S ") .. wpm .. " " .. accuracy .. "\n"
-    
     local f = love.filesystem.newFile(score_filename, "a")
     f:write(score_row)
     f:close()

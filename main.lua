@@ -1,9 +1,15 @@
-local practice = require "practice"
+loader = require "loader"
+practice = require "practice"
 
-local current_scene = practice
+local current_scene = loader
+
+function load_scene(scene, args)
+    current_scene = scene
+    scene:load(args)
+end
 
 function love.load()
-    current_scene:load()
+    loader:load("exercises")
 end
 
 function love.update(dt)
@@ -14,8 +20,8 @@ function love.draw()
     current_scene:draw()
 end
 
-function love.keypressed(key)
-    current_scene:keypressed(key)
+function love.keypressed(key, scancode, is_repeat)
+    current_scene:keypressed(key, scancode, is_repeat)
 end
 
 function love.textinput(text)
